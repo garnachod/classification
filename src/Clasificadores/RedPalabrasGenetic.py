@@ -6,6 +6,10 @@ from operator import add,mul
 from textblob import TextBlob
 from NodosPalabras.Nodo import Nodo
 from NodosPalabras.IndividuoRedPalabras import IndividuoRedPalabras
+from Particionado.DivisionPorcentual import DivisionPorcentual
+from Particionado.Particion import Particion
+from Instance import Instance
+from Instances import Instances
 import random
 import math
 
@@ -14,10 +18,10 @@ class RedPalabrasGenetic(object):
 	def __init__(self):
 		super(RedPalabrasGenetic, self).__init__()
 		self.modelo = None
-		self.nIndividuos = 15
+		self.nIndividuos = 6
 		self.listaIndividuos = []
-		self.nNuevosIndvPorEpoca = 2
-		self.nMaxElite = 4
+		self.nNuevosIndvPorEpoca = 1
+		self.nMaxElite = 3
 		self.nEpocas = 50
 
 	"""parametros es un string de configuracion para el clasificador"""
@@ -28,6 +32,12 @@ class RedPalabrasGenetic(object):
 		
 	"""data es un array de instancias"""
 	def buildClassifier(self, data):
+		porcentajeParticionado = 0.85
+		particionado = DivisionPorcentual()
+		particionado.setPorcentajeTrain(porcentajeParticionado)
+		particion = particionado.generaParticionesProporcional(data, True)
+		#instancias = data.getListInstances()
+		data = particion.getTrain()
 		#inicializacion
 		for i in range(0 , self.nIndividuos):
 			indv = IndividuoRedPalabras()
@@ -36,7 +46,9 @@ class RedPalabrasGenetic(object):
 
 		mejorIndividuo = None
 		mejorEpocas = 0
-		instancias = data.getListInstances()
+
+		
+		instancias = particion.getTest().getListInstances()
 
 		for epoca in range(0, self.nEpocas):
 			if epoca % 2 == 0:
@@ -111,6 +123,8 @@ class RedPalabrasGenetic(object):
 		#	print indv.correctas(data) / float(data.getNumeroInstances())
 
 		self.modelo = mejorIndividuo.duplica()
+		print self.modelo.pesoNoConexion
+		print self.modelo.pesoNoPalabra
 		print mejorEpocas / float(data.getNumeroInstances())
 
 	def privateClasificaInstanciasReTCount(self, individuo, instancias):

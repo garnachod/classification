@@ -35,7 +35,7 @@ class Nodo(object):
 
 	def randomizaTodosPesos(self):
 		for palabra in self.nodosConectados:
-			self.nodosConectados[palabra] += random.random() - 0.5
+			self.nodosConectados[palabra] += (random.random() - 0.5) * 0.1
 
 	def randomizaProporPesos(self, probabilidad, alpha):
 		for palabra in self.nodosConectados:
