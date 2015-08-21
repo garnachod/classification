@@ -67,8 +67,8 @@ class RedNeuronalBlist(Clasificador):
 		if data.getNumeroInstances() >= 1000:
 			self.activo_control_fin = True
 			particionado = DivisionPorcentual()
-			particionado.setPorcentajeTrain(0.8)
-			particion = particionado.generaParticionesProporcional(data)
+			particionado.setPorcentajeTrain(0.5)
+			particion = particionado.generaParticionesProporcional(data, True)
 			data = particion.getTrain()
 			self.conjuntoValidacion = particion.getTest()
 		
@@ -97,23 +97,12 @@ class RedNeuronalBlist(Clasificador):
 
 		instancias = data.getListInstances()
 
-		cuadratico_epoca_anterior = float("inf")
-
-		# Cabecera para el fichero
-		if self.debug:
-			self.debugFile.write("Época\t")
-			if test is not None:
-				self.debugFile.write("Error de test\t")
-			self.debugFile.write("Error train\tArray de pesos\n")
-
-		cuadratico_anterior = 1000
-		# 
 		salidaCapaOculta = range(1, self.neuronasCapaOculta+2)
 		salidaFinal = range(0, self.nClases)
 		#paso1
 		for epoca in xrange(0, self.nEpocas):
 			cuadratico_epoca = 0
-			#print epoca
+			print epoca
 			#paso2 por cada instancia en train
 			for instancia in instancias:
 				#***********inicio de Feedforward**********************************
@@ -129,22 +118,13 @@ class RedNeuronalBlist(Clasificador):
 					for indNeuronaEntr in xrange(0, self.nColumnas + 1):
 						suma += (self.pesosCapaOculta[indNeurona][indNeuronaEntr] * self.capaEntrada[indNeuronaEntr])
 					#aplicamos la sigmoidal a la suma, esto nos da la salida de la neurona
-					if self.bipolar == False:
-						#f1 
-						if suma > 200:
-							salidaCapaOculta[indNeurona + 1] = 1
-						elif suma < -40:
-							salidaCapaOculta[indNeurona + 1] = 0
-						else:
-							salidaCapaOculta[indNeurona + 1] = 1.0/(1.0 + math.exp( - suma))
+					#f2
+					if suma > 200:
+						salidaCapaOculta[indNeurona + 1] = 1
+					elif suma < -200:
+						salidaCapaOculta[indNeurona + 1] = -1
 					else:
-						#f2
-						if suma > 200:
-							salidaCapaOculta[indNeurona + 1] = 1
-						elif suma < -200:
-							salidaCapaOculta[indNeurona + 1] = -1
-						else:
-							salidaCapaOculta[indNeurona + 1] = (2.0/(1.0 + math.exp( - suma))) - 1.0
+						salidaCapaOculta[indNeurona + 1] = (2.0/(1.0 + math.exp( - suma))) - 1.0
 
 				#paso 5, calculamos las respuestas de las neuronas de la capa de salida, vector Y
 				#salidaFinal = []
@@ -153,35 +133,22 @@ class RedNeuronalBlist(Clasificador):
 					for indNeuronaOculta in xrange(0, self.neuronasCapaOculta + 1):
 						suma += (self.pesosCapaSalida[indNeurona][indNeuronaOculta] * salidaCapaOculta[indNeuronaOculta])
 					#aplicamos la sigmoidal a la suma, esto nos da la salida de la neurona
-					if self.bipolar == False:
-						#f1
-						if suma > 200:
-							salidaFinal[indNeurona] = 1
-						elif suma < -40:
-							salidaFinal[indNeurona] = 0
-						else:
-							salidaFinal[indNeurona] = 1.0/(1.0 + math.exp( - suma))
+
+					#f2
+					if suma > 200:
+						salidaFinal[indNeurona] = 1
+					elif suma < -200:
+						salidaFinal[indNeurona] = -1
 					else:
-						#f2
-						if suma > 200:
-							salidaFinal[indNeurona] = 1
-						elif suma < -200:
-							salidaFinal[indNeurona] = -1
-						else:
-							salidaFinal[indNeurona] = (2.0/(1.0 + math.exp( - suma))) - 1.0
+						salidaFinal[indNeurona] = (2.0/(1.0 + math.exp( - suma))) - 1.0
 				#***********fin de Feedforward **********************************
-				#calculo del error cuadratico medio
-				cuadratico_instancia = reduce(add, map((lambda x, y: (x - y)**2), vectoresObjetivos[instancia], salidaFinal))
-				cuadratico_epoca += cuadratico_instancia
+
 				#***********inicio Retropropagación del error *******************
 				
 				#paso 6
-				if self.bipolar == False:
-					#Tk - Yk * f1`(Yin)
-					deltaMinusculaK = map((lambda x, y: (x - y) * (y * (1.0 - y))), vectoresObjetivos[instancia], salidaFinal)
-				else:
-					#Tk - Yk * f2`(Yin)
-					deltaMinusculaK = map((lambda x, y: (x - y) * (0.5 * ((1 + y) * (1.0 - y)))), vectoresObjetivos[instancia], salidaFinal)
+
+				#Tk - Yk * f2`(Yin)
+				deltaMinusculaK = map((lambda x, y: (x - y) * (0.5 * ((1 + y) * (1.0 - y)))), vectoresObjetivos[instancia], salidaFinal)
 				
 				deltaMayusculaJK = []
 				for indNeuronaSalida in xrange(0, self.nClases):
@@ -194,18 +161,15 @@ class RedNeuronalBlist(Clasificador):
 				deltaMinInj = [0 for x in xrange(0, self.neuronasCapaOculta)]
 				for indNeurona in xrange(0, self.nClases):
 					for indNeuronaOculta  in xrange(1, self.neuronasCapaOculta + 1):
-						deltaMinInj[indNeuronaOculta - 1] += self.pesosCapaSalida[indNeurona][indNeuronaOculta]
+						deltaMinInj[indNeuronaOculta - 1] += (self.pesosCapaSalida[indNeurona][indNeuronaOculta] * deltaMinusculaK[indNeurona])
 
-				for indNeuronaOculta  in xrange(0, self.neuronasCapaOculta):
-						deltaMinInj[indNeuronaOculta] *= deltaMinusculaK[indNeurona]
+				"""for indNeurona in xrange(0, self.nClases):
+					for indNeuronaOculta  in xrange(0, self.neuronasCapaOculta):
+							deltaMinInj[indNeuronaOculta] *= deltaMinusculaK[indNeurona]
+				"""
 
-				deltaMinusculaJ = []
-				if self.bipolar == False:
-					#f`1
-					deltaMinusculaJ = map((lambda x, y: x * (y * (1.0 - y))),deltaMinInj, salidaCapaOculta[1:])
-				else:
-					#f`2
-					deltaMinusculaJ = map((lambda x, y: x *(0.5* ((1.0 + y) * (1.0 - y)))),deltaMinInj, salidaCapaOculta[1:])
+				#f`2
+				deltaMinusculaJ = map((lambda x, y: x *(0.5* ((1.0 + y) * (1.0 - y)))),deltaMinInj, salidaCapaOculta[1:])
 				
 				deltaMayusculaIJ = []
 				for indNeuronaOculta  in xrange(0, self.neuronasCapaOculta):
@@ -224,26 +188,6 @@ class RedNeuronalBlist(Clasificador):
 				#comprobar condicion de finalizacion
 				#fin de bucle de instancias
 
-			cuadratico_epoca = cuadratico_epoca/float(self.nInstaces * self.nClases)
-			if self.debug == True:
-				if test is None:
-					self.debugFile.write(str(epoca) + '\t' + str(cuadratico_epoca) + '\t') #+ str(self.getErrorFromInstances(data)) + '\t')
-				else:
-					self.debugFile.write(str(epoca) + '\t' + str(self.getErrorFromInstances(test)) + '\t' + str(self.getErrorFromInstances(data)) + '\t')
-				
-				#for indiceNOculta in xrange(0, self.neuronasCapaOculta):
-				#	map(lambda x: self.debugFile.write(str(x) + '\t'), self.pesosCapaOculta[indiceNOculta])
-				#for indiceClase in xrange(0, self.nClases):
-				#	map(lambda x: self.debugFile.write(str(x) + '\t'), self.pesosCapaSalida[indiceClase])
-				self.debugFile.write('\n')
-
-
-			difErrCuadratico = abs((cuadratico_epoca - self.errorCuadraticoMedio_old)/self.errorCuadraticoMedio_old)
-			#print difErrCuadratico
-			if difErrCuadratico < 0.00000001:
-				return
-
-			self.errorCuadraticoMedio_old = cuadratico_epoca
 
 			if self.activo_control_fin == True and epoca % 1 == 0:
 				#error = self.getECMFromInstances(self.conjuntoValidacion)
